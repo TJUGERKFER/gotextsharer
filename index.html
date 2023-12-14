@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-cmn-Hans">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, shrink-to-fit=no" />
+    <meta name="renderer" content="webkit" />
+    <meta name="force-rendering" content="webkit" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+
+    <!-- MDUI CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/mdui@1.0.2/dist/css/mdui.min.css" />
+</head>
+
+<body class="mdui-theme-primary-blue">
+    <div class="mdui-container">
+        <div class="mdui-panel" mdui-panel>
+            <div class="mdui-panel-item mdui-panel-item-open">
+                <div class="mdui-panel-item-header">读取消息</div>
+                <div class="mdui-panel-item-body">
+                    <p id="showmessage"></p>
+                    <div class="mdui-textfield">
+                        <input id="readtoken" class="mdui-textfield-input" type="text" placeholder="Token" />
+                    </div>
+                    <button onclick="readmessage()" class="mdui-btn mdui-btn-raised mdui-ripple mdui-btn-block 
+                    mdui-color-blue">读取</button>
+                </div>
+            </div>
+        </div>
+        <div class="mdui-panel" mdui-panel>
+            <div class="mdui-panel-item mdui-panel-item-open">
+                <div class="mdui-panel-item-header">发送消息</div>
+                <div class="mdui-panel-item-body">
+                    <div class="mdui-textfield">
+                        <input id="password" class="mdui-textfield-input" type="text" placeholder="Password" />
+                    </div>
+                    <div class="mdui-textfield">
+                        <input id="sendtoken" class="mdui-textfield-input" type="text" placeholder="Token" />
+                    </div>
+                    <div class="mdui-textfield">
+                        <label class="mdui-textfield-label">输入内容...</label>
+                        <textarea id="sendmessage" class="mdui-textfield-input"></textarea>
+                    </div>
+                    <button onclick="writemessage()" class="mdui-btn mdui-btn-raised mdui-ripple mdui-btn-block 
+                    mdui-color-blue">发送</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- MDUI JavaScript -->
+    <script src="https://unpkg.com/mdui@1.0.2/dist/js/mdui.min.js"></script>
+    <script>
+        function readmessage() {
+            var xhr = new XMLHttpRequest(); // 创建一个 XMLHttpRequest 对象
+            xhr.open("GET", "/read?token="+document.getElementById("readtoken").value, true); // 打开一个 GET 请求，指定后端接口地址和异步模式
+            xhr.onreadystatechange = function () { // 设置 onreadystatechange 事件处理函数
+                if (xhr.readyState == 4 && xhr.status == 200) { // 如果请求完成并且响应状态为 200
+                    document.getElementById("showmessage").innerHTML=xhr.responseText; // 获取响应数据
+                } else if(xhr.readyState == 4 && xhr.status != 200){
+                    mdui.alert(xhr.responseText);
+                }
+            };
+            xhr.send(); // 发送请求
+        }
+        function writemessage(){
+            var xhr = new XMLHttpRequest(); // 创建一个 XMLHttpRequest 对象
+            xhr.open("GET", "/write?token="+document.getElementById("sendtoken").value+"&password="+document.getElementById("password").value+"&message="+document.getElementById("sendmessage").value, true); // 打开一个 GET 请求，指定后端接口地址和异步模式
+            xhr.onreadystatechange = function () { // 设置 onreadystatechange 事件处理函数
+                if (xhr.readyState == 4 && xhr.status == 200) { // 如果请求完成并且响应状态为 200
+                    mdui.alert(xhr.responseText);
+                } else if(xhr.readyState == 4 && xhr.status != 200){
+                    mdui.alert(xhr.responseText);
+                }
+            };
+            xhr.send(); // 发送请求
+        }
+    </script>
+</body>
+
+</html>

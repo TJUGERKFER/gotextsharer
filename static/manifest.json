@@ -1,0 +1,22 @@
+{
+    "name": "文本推送器",
+    "short_name": "文本推送器",
+    "start_url": ".",
+    "display": "fullscreen",
+    "background_color": "#fff",
+    "theme_color": "#FFB300",
+    "description": "跨端传输文本工具",
+    "icons": [
+      {
+        "src": "icon.png",
+        "sizes": "200x200",
+        "type": "image/png"
+      },
+      {
+        "src": "icon512.png",
+        "sizes": "512x512",
+        "type": "image/png"
+      }
+    ],
+    "orientation": "landscape"
+  }
