@@ -7,17 +7,25 @@ import (
 	"html/template"
 	"io"
 	"io/fs"
+	"log"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
+	"time"
 )
 
 type MessageBody struct {
 	Token   string `json:"token"`
-	Pwd     string `json:"password"`
+	Uid     string `json:"userid"`
 	Message string `json:"message"`
+}
+
+type Profile struct {
+	AdminPwd string   `json:"adminpassword"`
+	UserList []string `json:"userlist"`
 }
 
 //go:embed static
@@ -34,6 +42,7 @@ func readFileHandle(w http.ResponseWriter, r *http.Request, token string, output
 	}
 
 	cwd, _ := os.Getwd()
+	cwd += "/message"
 	msgpath := filepath.Clean(path.Join(cwd, token))
 	relpath, _ := filepath.Rel(cwd, msgpath)
 	if selfpath, _ := os.Executable(); strings.Contains(relpath, "..") || msgpath == selfpath {
@@ -68,6 +77,16 @@ func main() {
 	sub, _ := fs.Sub(static, "static") // 取出 static 子文件夹
 	http.Handle("/", http.FileServer(http.FS(sub)))
 	// 定义一个处理函数，它会在"/"路径下被调用
+	profilefile, err := os.ReadFile("./profile.json") //读取用户列表
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var profile Profile
+	json.Unmarshal(profilefile, &profile)
+	if err != nil {
+		log.Fatal(err)
+	}
 	http.HandleFunc("/write", func(w http.ResponseWriter, r *http.Request) {
 		// 从请求的查询字符串中获取token和message参数
 
@@ -78,13 +97,13 @@ func main() {
 		var messagebody MessageBody
 		data, _ := io.ReadAll(r.Body)
 		json.Unmarshal(data, &messagebody)
-		password := messagebody.Pwd
+		userid := messagebody.Uid
 		token := messagebody.Token
 		message := messagebody.Message
 
-		if password != "661333" {
+		if !slices.Contains(profile.UserList, userid) {
 			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprint(w, "密码错误")
+			fmt.Fprint(w, "用户不存在，请联系管理员")
 			return
 		}
 
@@ -95,6 +114,7 @@ func main() {
 			return
 		}
 		cwd, _ := os.Getwd()
+		cwd += "/message"
 		msgpath := filepath.Clean(path.Join(cwd, token))
 		relpath, _ := filepath.Rel(cwd, msgpath)
 		if selfpath, _ := os.Executable(); strings.Contains(relpath, "..") || msgpath == selfpath {
@@ -110,7 +130,7 @@ func main() {
 			fmt.Fprint(w, "写入文件失败:", err)
 			return
 		}
-
+		wlog(userid + "写入" + token)
 		// 如果写入成功，返回一个200状态码和一个成功的消息
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, "发送成功")
@@ -133,4 +153,7 @@ func main() {
 
 	// 在80端口上监听并接受连接
 	http.ListenAndServe(":80", nil)
+}
+func wlog(message string) {
+	fmt.Println(time.Now().Format("2006-01-02 15:04:05") + ":" + message)
 }
