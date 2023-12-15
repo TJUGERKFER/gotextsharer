@@ -2,9 +2,9 @@
     "name": "文本推送器",
     "short_name": "文本推送器",
     "start_url": ".",
-    "display": "fullscreen",
+    "display": "standalone",
     "background_color": "#fff",
-    "theme_color": "#FFB300",
+    "theme_color": "#2196F3",
     "description": "跨端传输文本工具",
     "icons": [
       {
