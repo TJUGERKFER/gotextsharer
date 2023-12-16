@@ -8,8 +8,8 @@ const addResourcesToCache = async (resources) => {
       addResourcesToCache([
         "/",
         "/index.html",
-        "/mdui.min.css",
-        "/mdui.min.js",
+        "/css/mdui.min.css",
+        "/js/mdui.min.js",
         "/admin/index.html",
       ]),
     );

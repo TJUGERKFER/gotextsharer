@@ -2,18 +2,29 @@
 <html lang="zh-cmn-Hans">
 
 <head>
+    <title>跨端文本传输工具</title>
+    <link rel="shortcut icon" href="/icons/favicon.ico" mce_href="/favicon.ico" type="image/x-icon">
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, shrink-to-fit=no" />
     <meta name="renderer" content="webkit" />
     <meta name="force-rendering" content="webkit" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="/js/manifest.json">
     <!-- MDUI CSS -->
-    <link rel="stylesheet" href="/mdui.min.css" />
+    <link rel="stylesheet" href="/css/mdui.min.css" />
 </head>
+
 
 <body class="mdui-theme-primary-blue">
     <div class="mdui-container">
+        <div class="mdui-toolbar">
+            <span class="mdui-typo-title">跨端文本传输工具</span>
+            <div class="mdui-toolbar-spacer"></div>
+            <span class="mdui-btn mdui-btn-icon mdui-ripple mdui-ripple-white" mdui-tooltip="{content: '夜间模式'}"
+                onclick="changebrightness()">
+                <i class="mdui-icon material-icons">brightness_2</i>
+            </span>
+        </div>
         <div class="mdui-panel" mdui-panel>
             <div class="mdui-panel-item mdui-panel-item-open">
                 <div class="mdui-panel-item-header">读取消息</div>
@@ -25,4 +36,5 @@
             </div>
         </div>
     </div>
+    <script src="/js/changebrightness.js"></script>
 </body>
