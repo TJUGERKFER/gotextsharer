@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/md5"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -11,16 +12,27 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/cespare/xxhash/v2"
 )
 
 type MessageBody struct {
 	Token   string `json:"token"`
 	Uid     string `json:"userid"`
 	Message string `json:"message"`
+}
+
+type ChangePwdStruct struct {
+	NewPwd string `json:"newpassword"`
+	OldPwd string `json:"oldpassword"`
+}
+
+type AddUserStruct struct {
+	Uid string `json:"userid"`
+	Pwd string `json:"password"`
 }
 
 type Profile struct {
@@ -42,14 +54,7 @@ func readFileHandle(w http.ResponseWriter, r *http.Request, token string, output
 	}
 
 	cwd, _ := os.Getwd()
-	cwd += "/message"
-	msgpath := filepath.Clean(path.Join(cwd, token))
-	relpath, _ := filepath.Rel(cwd, msgpath)
-	if selfpath, _ := os.Executable(); strings.Contains(relpath, "..") || msgpath == selfpath {
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, "非法请求")
-		return
-	}
+	msgpath := path.Join(cwd, "/message", fmt.Sprintf("%x", xxhash.Sum64String(token)))
 
 	// 从以token为文件名的文件中读取内容
 	data, err := os.ReadFile(msgpath)
@@ -114,14 +119,7 @@ func main() {
 			return
 		}
 		cwd, _ := os.Getwd()
-		cwd += "/message"
-		msgpath := filepath.Clean(path.Join(cwd, token))
-		relpath, _ := filepath.Rel(cwd, msgpath)
-		if selfpath, _ := os.Executable(); strings.Contains(relpath, "..") || msgpath == selfpath {
-			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprint(w, "非法请求")
-			return
-		}
+		msgpath := path.Join(cwd, "/message", fmt.Sprintf("%x", xxhash.Sum64String(token)))
 		// 将message的内容写入到以token为文件名的文件中
 		err := os.WriteFile(msgpath, []byte(message), 0644)
 		if err != nil {
@@ -151,9 +149,61 @@ func main() {
 		readFileHandle(w, r, path[2], true)
 	})
 
+	http.HandleFunc("/changepwd", func(w http.ResponseWriter, r *http.Request) {
+
+		if !(r.Method == "POST" && r.ParseForm() == nil) {
+			fmt.Fprint(w, "非法请求")
+			return
+		}
+
+		var changepwdstruct ChangePwdStruct
+		data, _ := io.ReadAll(r.Body)
+		json.Unmarshal(data, &changepwdstruct)
+
+		if profile.AdminPwd != MD5(changepwdstruct.OldPwd) {
+			fmt.Fprint(w, "密码错误")
+			return
+		}
+
+		profile.AdminPwd = MD5(changepwdstruct.NewPwd)
+		filebuf, _ := json.Marshal(profile)
+		os.WriteFile("profile.json", filebuf, 0666)
+		fmt.Fprint(w, "修改成功！")
+		wlog("修改密码，MD5值为" + profile.AdminPwd)
+
+	})
+
+	http.HandleFunc("/adduser", func(w http.ResponseWriter, r *http.Request) {
+		if !(r.Method == "POST" && r.ParseForm() == nil) {
+			fmt.Fprint(w, "非法请求")
+			return
+		}
+
+		var adduserstruct AddUserStruct
+		data, _ := io.ReadAll(r.Body)
+		json.Unmarshal(data, &adduserstruct)
+
+		if profile.AdminPwd != MD5(adduserstruct.Pwd) {
+			fmt.Fprint(w, "密码错误")
+			return
+		}
+
+		profile.UserList = append(profile.UserList, adduserstruct.Uid)
+		filebuf, _ := json.Marshal(profile)
+		os.WriteFile("profile.json", filebuf, 0666)
+		fmt.Fprint(w, "创建成功！")
+		wlog("增加用户" + adduserstruct.Uid)
+	})
+
 	// 在80端口上监听并接受连接
 	http.ListenAndServe(":80", nil)
 }
 func wlog(message string) {
 	fmt.Println(time.Now().Format("2006-01-02 15:04:05") + ":" + message)
+}
+func MD5(str string) string {
+	data := []byte(str) //切片
+	has := md5.Sum(data)
+	md5str := fmt.Sprintf("%x", has) //将 []byte转成16进制
+	return md5str
 }
