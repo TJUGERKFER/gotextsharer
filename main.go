@@ -8,7 +8,6 @@ import (
 	"html/template"
 	"io"
 	"io/fs"
-	"log"
 	"net/http"
 	"os"
 	"path"
@@ -78,27 +77,54 @@ func readFileHandle(w http.ResponseWriter, r *http.Request, token string, output
 	}
 }
 
+func wlog(message string) {
+	fmt.Println(time.Now().Format("2006-01-02 15:04:05") + ":" + message)
+}
+
+func MD5(str string) string {
+	data := []byte(str) //切片
+	has := md5.Sum(data)
+	md5str := fmt.Sprintf("%x", has) //将 []byte转成16进制
+	return md5str
+}
+
+func requestCheck(w http.ResponseWriter, r *http.Request) bool {
+
+	if !(r.Method == "POST" && r.ParseForm() == nil) {
+		fmt.Fprint(w, "非法请求")
+		return false
+	}
+
+	_, err := os.Stat("./install.lock")
+	if err != nil {
+		fmt.Fprint(w, "请先访问/setup进行安装")
+		return false
+	}
+
+	return true
+}
+
 func main() {
 	sub, _ := fs.Sub(static, "static") // 取出 static 子文件夹
 	http.Handle("/", http.FileServer(http.FS(sub)))
 	// 定义一个处理函数，它会在"/"路径下被调用
 	profilefile, err := os.ReadFile("./profile.json") //读取用户列表
 	if err != nil {
-		log.Fatal(err)
+		wlog("读取配置文件失败，可能未正确安装")
 	}
 
 	var profile Profile
 	json.Unmarshal(profilefile, &profile)
 	if err != nil {
-		log.Fatal(err)
+		wlog("解析配置文件失败，可能未正确安装")
 	}
-	http.HandleFunc("/write", func(w http.ResponseWriter, r *http.Request) {
-		// 从请求的查询字符串中获取token和message参数
 
-		if !(r.Method == "POST" && r.ParseForm() == nil) {
-			fmt.Fprint(w, "非法请求")
+	http.HandleFunc("/write", func(w http.ResponseWriter, r *http.Request) {
+
+		if !requestCheck(w, r) {
 			return
 		}
+
 		var messagebody MessageBody
 		data, _ := io.ReadAll(r.Body)
 		json.Unmarshal(data, &messagebody)
@@ -151,8 +177,7 @@ func main() {
 
 	http.HandleFunc("/changepwd", func(w http.ResponseWriter, r *http.Request) {
 
-		if !(r.Method == "POST" && r.ParseForm() == nil) {
-			fmt.Fprint(w, "非法请求")
+		if !requestCheck(w, r) {
 			return
 		}
 
@@ -174,8 +199,7 @@ func main() {
 	})
 
 	http.HandleFunc("/adduser", func(w http.ResponseWriter, r *http.Request) {
-		if !(r.Method == "POST" && r.ParseForm() == nil) {
-			fmt.Fprint(w, "非法请求")
+		if !requestCheck(w, r) {
 			return
 		}
 
@@ -195,15 +219,41 @@ func main() {
 		wlog("增加用户" + adduserstruct.Uid)
 	})
 
+	http.HandleFunc("/setupapi", func(w http.ResponseWriter, r *http.Request) {
+
+		_, err := os.Stat("./install.lock")
+		if err == nil {
+			fmt.Fprint(w, "请勿重复安装！")
+			return
+		}
+
+		if !(r.Method == "POST" && r.ParseForm() == nil) {
+			fmt.Fprint(w, "非法请求")
+			return
+		}
+
+		data, _ := io.ReadAll(r.Body)
+		var newprofile Profile
+		json.Unmarshal(data, &newprofile)
+
+		if newprofile.AdminPwd == "" || len(newprofile.UserList) == 0 {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, "密码或userid参数不能为空")
+			return
+		}
+		newprofile.AdminPwd = MD5(newprofile.AdminPwd)
+		filebuf, _ := json.Marshal(newprofile)
+		os.WriteFile("profile.json", filebuf, 0666)
+		lock, err := os.Create("install.lock")
+		if err != nil {
+			fmt.Fprint(w, "安装锁文件创建失败！")
+			return
+		}
+		defer lock.Close()
+		profile = newprofile
+		fmt.Fprint(w, "安装成功")
+		wlog("系统安装成功")
+	})
 	// 在80端口上监听并接受连接
 	http.ListenAndServe(":80", nil)
-}
-func wlog(message string) {
-	fmt.Println(time.Now().Format("2006-01-02 15:04:05") + ":" + message)
-}
-func MD5(str string) string {
-	data := []byte(str) //切片
-	has := md5.Sum(data)
-	md5str := fmt.Sprintf("%x", has) //将 []byte转成16进制
-	return md5str
 }
