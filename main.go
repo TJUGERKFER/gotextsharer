@@ -45,7 +45,7 @@ var static embed.FS
 func readFileHandle(w http.ResponseWriter, r *http.Request, token string, outputAsHTML bool) {
 	// 从请求的查询字符串中获取token参数
 
-	// 如果token为空，返回一个400状态码和一个错误的消息
+	// 如果token为空，返回一个400状态码
 	if token == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprint(w, "token参数不能为空")
@@ -59,13 +59,13 @@ func readFileHandle(w http.ResponseWriter, r *http.Request, token string, output
 	data, err := os.ReadFile(msgpath)
 	message := string(data)
 	if err != nil {
-		// 如果读取失败，返回一个500状态码和一个错误的消息
+		// 如果读取失败，返回500状态码
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprint(w, "消息不存在或其他数据库异常")
+		fmt.Fprint(w, "消息不存在或其他异常")
 		return
 	}
 
-	// 如果读取成功，返回一个200状态码和文件的内容
+	// 如果读取成功，返回200状态码
 	w.WriteHeader(http.StatusOK)
 	if outputAsHTML {
 		tmpl, _ := template.ParseFiles("./read.html")
@@ -77,6 +77,7 @@ func readFileHandle(w http.ResponseWriter, r *http.Request, token string, output
 	}
 }
 
+// 日志函数
 func wlog(message string) {
 	fmt.Println(time.Now().Format("2006-01-02 15:04:05") + ":" + message)
 }
@@ -88,6 +89,7 @@ func MD5(str string) string {
 	return md5str
 }
 
+// 检查POST请求是否正确和是否已经安装程序
 func requestCheck(w http.ResponseWriter, r *http.Request) bool {
 
 	if !(r.Method == "POST" && r.ParseForm() == nil) {
@@ -95,7 +97,7 @@ func requestCheck(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 
-	_, err := os.Stat("./install.lock")
+	_, err := os.Stat("./config/install.lock")
 	if err != nil {
 		fmt.Fprint(w, "请先访问/setup进行安装")
 		return false
@@ -107,8 +109,8 @@ func requestCheck(w http.ResponseWriter, r *http.Request) bool {
 func main() {
 	sub, _ := fs.Sub(static, "static") // 取出 static 子文件夹
 	http.Handle("/", http.FileServer(http.FS(sub)))
-	// 定义一个处理函数，它会在"/"路径下被调用
-	profilefile, err := os.ReadFile("./profile.json") //读取用户列表
+	wlog("程序启动，版本v1.0.0")
+	profilefile, err := os.ReadFile("./config/profile.json") //读取用户列表和密码
 	if err != nil {
 		wlog("读取配置文件失败，可能未正确安装")
 	}
@@ -118,13 +120,13 @@ func main() {
 	if err != nil {
 		wlog("解析配置文件失败，可能未正确安装")
 	}
-
+	// 写入消息函数
 	http.HandleFunc("/write", func(w http.ResponseWriter, r *http.Request) {
 
 		if !requestCheck(w, r) {
 			return
 		}
-
+		// 从POST请求读取数据
 		var messagebody MessageBody
 		data, _ := io.ReadAll(r.Body)
 		json.Unmarshal(data, &messagebody)
@@ -138,7 +140,7 @@ func main() {
 			return
 		}
 
-		// 如果token或message为空，返回一个400状态码和一个错误的消息
+		// 如果token或message为空，返回400状态
 		if token == "" || message == "" {
 			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprint(w, "token和message参数不能为空")
@@ -149,23 +151,23 @@ func main() {
 		// 将message的内容写入到以token为文件名的文件中
 		err := os.WriteFile(msgpath, []byte(message), 0644)
 		if err != nil {
-			// 如果写入失败，返回一个500状态码和一个错误的消息
+			// 如果写入失败，返回500状态
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprint(w, "写入文件失败:", err)
 			return
 		}
 		wlog(userid + "写入" + token)
-		// 如果写入成功，返回一个200状态码和一个成功的消息
+		// 如果写入成功，返回200状态码
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, "发送成功")
 	})
 
-	// 定义一个新的处理函数，它会在"/read"路径下被调用
+	// 读取消息函数
 	http.HandleFunc("/read", func(w http.ResponseWriter, r *http.Request) {
 		readFileHandle(w, r, r.URL.Query().Get("token"), false)
 	})
 
-	// 定义一个新的处理函数，它会在"/s/"路径下被调用
+	// 伪静态 重定向到/read
 	http.HandleFunc("/s/", func(w http.ResponseWriter, r *http.Request) {
 		path := strings.Split(r.URL.Path, "/")
 		if len(path) != 3 {
@@ -174,7 +176,7 @@ func main() {
 		}
 		readFileHandle(w, r, path[2], true)
 	})
-
+	// 修改密码函数
 	http.HandleFunc("/changepwd", func(w http.ResponseWriter, r *http.Request) {
 
 		if !requestCheck(w, r) {
@@ -184,20 +186,20 @@ func main() {
 		var changepwdstruct ChangePwdStruct
 		data, _ := io.ReadAll(r.Body)
 		json.Unmarshal(data, &changepwdstruct)
-
+		// 验证原密码
 		if profile.AdminPwd != MD5(changepwdstruct.OldPwd) {
 			fmt.Fprint(w, "密码错误")
 			return
 		}
-
+		// 写入配置文件
 		profile.AdminPwd = MD5(changepwdstruct.NewPwd)
 		filebuf, _ := json.Marshal(profile)
-		os.WriteFile("profile.json", filebuf, 0666)
+		os.WriteFile("./config/profile.json", filebuf, 0666)
 		fmt.Fprint(w, "修改成功！")
 		wlog("修改密码，MD5值为" + profile.AdminPwd)
 
 	})
-
+	// 添加用户函数
 	http.HandleFunc("/adduser", func(w http.ResponseWriter, r *http.Request) {
 		if !requestCheck(w, r) {
 			return
@@ -211,17 +213,17 @@ func main() {
 			fmt.Fprint(w, "密码错误")
 			return
 		}
-
+		// 写入配置文件
 		profile.UserList = append(profile.UserList, adduserstruct.Uid)
 		filebuf, _ := json.Marshal(profile)
-		os.WriteFile("profile.json", filebuf, 0666)
+		os.WriteFile("./config/profile.json", filebuf, 0666)
 		fmt.Fprint(w, "创建成功！")
 		wlog("增加用户" + adduserstruct.Uid)
 	})
-
+	// 安装函数
 	http.HandleFunc("/setupapi", func(w http.ResponseWriter, r *http.Request) {
-
-		_, err := os.Stat("./install.lock")
+		// 检测是否已经安装
+		_, err := os.Stat("./config/install.lock")
 		if err == nil {
 			fmt.Fprint(w, "请勿重复安装！")
 			return
@@ -231,7 +233,7 @@ func main() {
 			fmt.Fprint(w, "非法请求")
 			return
 		}
-
+		// 读取数据
 		data, _ := io.ReadAll(r.Body)
 		var newprofile Profile
 		json.Unmarshal(data, &newprofile)
@@ -243,8 +245,9 @@ func main() {
 		}
 		newprofile.AdminPwd = MD5(newprofile.AdminPwd)
 		filebuf, _ := json.Marshal(newprofile)
-		os.WriteFile("profile.json", filebuf, 0666)
-		lock, err := os.Create("install.lock")
+		// 创建install.lock
+		os.WriteFile("./config/profile.json", filebuf, 0666)
+		lock, err := os.Create("./config/install.lock")
 		if err != nil {
 			fmt.Fprint(w, "安装锁文件创建失败！")
 			return
