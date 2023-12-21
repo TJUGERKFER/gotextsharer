@@ -109,7 +109,19 @@ func requestCheck(w http.ResponseWriter, r *http.Request) bool {
 func main() {
 	sub, _ := fs.Sub(static, "static") // 取出 static 子文件夹
 	http.Handle("/", http.FileServer(http.FS(sub)))
-	wlog("程序启动，版本v1.0.0")
+
+	wlog("程序启动，版本v1.0.1")
+	_, err := os.Stat("config")
+	if err != nil {
+		wlog("config目录不存在，创建中")
+		os.Mkdir("config", 0666)
+	}
+	_, err = os.Stat("message")
+	if err != nil {
+		wlog("message目录不存在，创建中")
+		os.Mkdir("message", 0666)
+	}
+
 	profilefile, err := os.ReadFile("./config/profile.json") //读取用户列表和密码
 	if err != nil {
 		wlog("读取配置文件失败，可能未正确安装")
