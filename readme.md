@@ -17,11 +17,17 @@
       context: ./goshare/build # 将项目文件放于此处以进行编译
     restart: unless-stopped
     volumes:
-      - ./goshare/message:/message
-      - ./goshare/config:/config
+      - ./goshare/message:/app/message
+      - ./goshare/config:/app/config
     ports:
       - 80:80 # 也可通过nginx等进行反代
 ```
+然后使用
+```
+docker compose up goshare --build -d
+```
+进行构建。
+
 也可以直接编译使用：
 ```
 go build .
@@ -39,7 +45,7 @@ go build .
 - [x]简易日志系统和多用户系统
 - [ ]消息索引
 - [ ]更完善的消息读取机制
-
+- [ ]完善的PWA应用
 ## 致谢
 ---
 - [@bbaa](https://github.com/bbaa-bbaa) 技术支持/功能建议
