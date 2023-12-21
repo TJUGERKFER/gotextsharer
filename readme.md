@@ -11,7 +11,7 @@
 ---
 项目默认监听80端口，推荐使用docker compose模板编排，以下是一个示例：
 ```
-  goshare:
+  gotextsharer:
     command: ./main
     build:
       context: ./goshare/build # 将项目文件放于此处以进行编译
@@ -24,7 +24,7 @@
 ```
 然后使用
 ```
-docker compose up goshare --build -d
+docker compose up gotextsharer --build -d
 ```
 进行构建。
 
