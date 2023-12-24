@@ -33,7 +33,10 @@
             <div class="mdui-panel-item mdui-panel-item-open">
                 <div class="mdui-panel-item-header">读取消息</div>
                 <div class="mdui-panel-item-body">
-                    <p id="showmessage"></p>
+                    <div id="showmessagefield" class="mdui-textfield">
+                        <label class="mdui-textfield-label">读取的消息会显示在下方</label>
+                        <textarea id="showmessage" class="mdui-textfield-input" disabled></textarea>
+                    </div>
                     <div class="mdui-textfield">
                         <input id="readtoken" class="mdui-textfield-input" type="text" placeholder="Token" />
                     </div>
@@ -94,7 +97,8 @@
                     token: $(readtoken)[0].value,
                 },
                 success: function (data) {
-                    $(showmessage)[0].innerHTML = data;
+                    $(showmessage)[0].value = data;
+                    mdui.updateTextFields($(showmessagefield)[0])
                 },
                 error: function (xhr, textStatus) {
                     mdui.alert(xhr.responseText);
