@@ -38,13 +38,13 @@ go build .
 
 ## TODO
 - [x] 简易日志系统和多用户系统
-- [ ] 消息索引
-- [ ] 更完善的消息读取机制
+- [x] 消息索引
+- [x] 更完善的消息读取机制
 - [ ] 完善的PWA应用
-- [ ] 删除消息功能
+- [x] 删除消息功能
 - [ ] 阅后即焚
 ## 致谢
 - [@bbaa](https://github.com/bbaa-bbaa) 技术支持/功能建议
 
 - [MDUI](https://github.com/zdhxiong/mdui) 前端框架
-- [xxhash](https://github.com/cespare/xxhash/) 用go实现的xxhash库
+- [xxhash](https://github.com/cespare/xxhash/) 基于go的xxhash实现

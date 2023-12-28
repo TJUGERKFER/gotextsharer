@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"io"
 	"io/fs"
+	"log"
 	"net/http"
 	"os"
 	"path"
@@ -37,6 +38,11 @@ type AddUserStruct struct {
 type Profile struct {
 	AdminPwd string   `json:"adminpassword"`
 	UserList []string `json:"userlist"`
+}
+
+type MessageIndex struct {
+	Userid string    `json:"userid"`
+	Time   time.Time `json:"time"`
 }
 
 //go:embed static
@@ -106,32 +112,64 @@ func requestCheck(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
+func writeIndex(messageindex map[string]MessageIndex) {
+	filebuf, _ := json.Marshal(messageindex)
+	err := os.WriteFile("./message/index.json", filebuf, 0666)
+	if err != nil {
+		log.Fatal("写入索引失败！请检查程序读写权限")
+	}
+}
+
+func isFileExist(filename string) bool {
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		return false
+	}
+	return true
+}
+
 func main() {
 	sub, _ := fs.Sub(static, "static") // 取出 static 子文件夹
 	http.Handle("/", http.FileServer(http.FS(sub)))
 
 	wlog("程序启动，版本v1.0.1")
-	_, err := os.Stat("config")
-	if err != nil {
+
+	if !isFileExist("config") {
 		wlog("config目录不存在，创建中")
 		os.Mkdir("config", 0666)
 	}
-	_, err = os.Stat("message")
-	if err != nil {
+
+	if !isFileExist("message") {
 		wlog("message目录不存在，创建中")
 		os.Mkdir("message", 0666)
 	}
 
 	profilefile, err := os.ReadFile("./config/profile.json") //读取用户列表和密码
+	var profile Profile
 	if err != nil {
 		wlog("读取配置文件失败，可能未正确安装")
+	} else {
+		json.Unmarshal(profilefile, &profile)
+		if err != nil {
+			wlog("解析配置文件失败，可能未正确安装")
+		}
 	}
 
-	var profile Profile
-	json.Unmarshal(profilefile, &profile)
+	messageindex := make(map[string]MessageIndex)
+	messageindexfile, err := os.ReadFile("./message/index.json")
 	if err != nil {
-		wlog("解析配置文件失败，可能未正确安装")
+		wlog("读取消息索引文件失败，未读取而创建新索引到内存")
+		var tmp MessageIndex
+		tmp.Time = time.Now()
+		tmp.Userid = "exampleid"
+		messageindex["examplemessage"] = tmp
+	} else {
+		json.Unmarshal(messageindexfile, &messageindex)
+		if err != nil {
+			log.Fatal("解析消息索引失败，请检查或删除文件并再次启动！")
+		}
+
 	}
+
 	// 写入消息函数
 	http.HandleFunc("/write", func(w http.ResponseWriter, r *http.Request) {
 
@@ -152,16 +190,55 @@ func main() {
 			return
 		}
 
-		// 如果token或message为空，返回400状态
-		if token == "" || message == "" {
+		// 如果token为空，返回400状态
+		if token == "" {
 			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprint(w, "token和message参数不能为空")
+			fmt.Fprint(w, "token参数不能为空")
 			return
 		}
+
+		//获取消息路径
 		cwd, _ := os.Getwd()
-		msgpath := path.Join(cwd, "/message", fmt.Sprintf("%x", xxhash.Sum64String(token)))
+		hashedtoken := xxhash.Sum64String(token)
+		msgpath := path.Join(cwd, "/message", fmt.Sprintf("%x", hashedtoken))
+		// 判断消息token
+		if _, ok := messageindex[token]; ok {
+			if message != "" && messageindex[token].Userid == userid {
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprint(w, "该token已被你使用过，如需再次使用请先输入空内容删除消息！")
+				return
+			}
+
+			if isFileExist(msgpath) && messageindex[token].Userid != userid {
+				w.WriteHeader(http.StatusBadRequest)
+				fmt.Fprint(w, "消息token已被其他用户使用或hash碰撞,请尝试其他token")
+				return
+			}
+
+			delete(messageindex, token)
+			err := os.Remove(msgpath)
+			if err != nil {
+				fmt.Println(err)
+			}
+			writeIndex(messageindex)
+			w.WriteHeader(http.StatusOK)
+			wlog(userid + "删除" + token)
+			fmt.Fprint(w, "清除消息成功！")
+			return
+		}
+
+		// 添加消息到索引中
+		var newindex MessageIndex
+
+		newindex.Time = time.Now()
+		newindex.Userid = userid
+		messageindex[token] = newindex
+
+		// 保存索引
+		writeIndex(messageindex)
+
 		// 将message的内容写入到以token为文件名的文件中
-		err := os.WriteFile(msgpath, []byte(message), 0644)
+		err = os.WriteFile(msgpath, []byte(message), 0644)
 		if err != nil {
 			// 如果写入失败，返回500状态
 			w.WriteHeader(http.StatusInternalServerError)
