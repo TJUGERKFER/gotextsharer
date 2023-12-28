@@ -131,7 +131,7 @@ func main() {
 	sub, _ := fs.Sub(static, "static") // 取出 static 子文件夹
 	http.Handle("/", http.FileServer(http.FS(sub)))
 
-	wlog("程序启动，版本v1.0.1")
+	wlog("程序启动，版本v1.1")
 
 	if !isFileExist("config") {
 		wlog("config目录不存在，创建中")
