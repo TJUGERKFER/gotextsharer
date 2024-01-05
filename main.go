@@ -41,8 +41,8 @@ type Profile struct {
 }
 
 type MessageIndex struct {
-	Userid string    `json:"userid"`
-	Time   time.Time `json:"time"`
+	Userid string `json:"userid"`
+	Time   string `json:"time"`
 }
 
 //go:embed static
@@ -57,7 +57,6 @@ func readFileHandle(w http.ResponseWriter, r *http.Request, token string, output
 		fmt.Fprint(w, "token参数不能为空")
 		return
 	}
-
 	cwd, _ := os.Getwd()
 	msgpath := path.Join(cwd, "/message", fmt.Sprintf("%x", xxhash.Sum64String(token)))
 
@@ -96,11 +95,13 @@ func MD5(str string) string {
 }
 
 // 检查POST请求是否正确和是否已经安装程序
-func requestCheck(w http.ResponseWriter, r *http.Request) bool {
+func requestCheck(w http.ResponseWriter, r *http.Request, ispost bool) bool {
 
 	if !(r.Method == "POST" && r.ParseForm() == nil) {
-		fmt.Fprint(w, "非法请求")
-		return false
+		if ispost {
+			fmt.Fprint(w, "非法请求")
+			return false
+		}
 	}
 
 	_, err := os.Stat("./config/install.lock")
@@ -159,7 +160,7 @@ func main() {
 	if err != nil {
 		wlog("读取消息索引文件失败，未读取而创建新索引到内存")
 		var tmp MessageIndex
-		tmp.Time = time.Now()
+		tmp.Time = fmt.Sprintf("%d", time.Now().Unix())
 		tmp.Userid = "exampleid"
 		messageindex["examplemessage"] = tmp
 	} else {
@@ -173,7 +174,7 @@ func main() {
 	// 写入消息函数
 	http.HandleFunc("/write", func(w http.ResponseWriter, r *http.Request) {
 
-		if !requestCheck(w, r) {
+		if !requestCheck(w, r, true) {
 			return
 		}
 		// 从POST请求读取数据
@@ -230,7 +231,7 @@ func main() {
 		// 添加消息到索引中
 		var newindex MessageIndex
 
-		newindex.Time = time.Now()
+		newindex.Time = fmt.Sprintf("%d", time.Now().Unix())
 		newindex.Userid = userid
 		messageindex[token] = newindex
 
@@ -255,7 +256,18 @@ func main() {
 	http.HandleFunc("/read", func(w http.ResponseWriter, r *http.Request) {
 		readFileHandle(w, r, r.URL.Query().Get("token"), false)
 	})
-
+	http.HandleFunc("/getindex", func(w http.ResponseWriter, r *http.Request) {
+		if !requestCheck(w, r, false) {
+			return
+		}
+		if profile.AdminPwd != MD5(r.URL.Query().Get("password")) {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, "密码错误")
+			return
+		}
+		indexjsonbyte, _ := json.Marshal(messageindex)
+		fmt.Fprint(w, string(indexjsonbyte))
+	})
 	// 伪静态 重定向到/read
 	http.HandleFunc("/s/", func(w http.ResponseWriter, r *http.Request) {
 		path := strings.Split(r.URL.Path, "/")
@@ -268,7 +280,7 @@ func main() {
 	// 修改密码函数
 	http.HandleFunc("/changepwd", func(w http.ResponseWriter, r *http.Request) {
 
-		if !requestCheck(w, r) {
+		if !requestCheck(w, r, true) {
 			return
 		}
 
@@ -290,7 +302,7 @@ func main() {
 	})
 	// 添加用户函数
 	http.HandleFunc("/adduser", func(w http.ResponseWriter, r *http.Request) {
-		if !requestCheck(w, r) {
+		if !requestCheck(w, r, true) {
 			return
 		}
 
